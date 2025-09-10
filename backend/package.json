@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "@nuxt/types": "^2.18.1",
+    "@nuxtjs/i18n": "^10.0.6"
+  }
+}
