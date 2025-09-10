@@ -46,9 +46,14 @@
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onActivated, watch } from 'vue'
+import RoleService from '@/services/roles'
 // Định nghĩa reload ở scope ngoài để dùng cho cả add/remove event listener
-const reload = () => EmployeeService.fetch && EmployeeService.fetch(true);
+const reload = async () => {
+    console.log('Reload called: force fetching employees and roles');
+    await EmployeeService.fetch && EmployeeService.fetch(true);
+    await RoleService.fetch && RoleService.fetch(true);
+};
 import type { ChartData } from 'chart.js'
 import { useEmployeesStore } from '@/stores/business/employee'
 import EmployeeBarChart from '~/components/EmployeeBarChart.vue'
@@ -78,21 +83,15 @@ const statusPieOptions = {
     }
 };
 
-// Horizontal Bar chart cho Roles (roles là mảng object, lấy role.name)
+// Horizontal Bar chart cho Roles: luôn lấy labels từ store roles, role không có người vẫn hiển thị 0
+const rolesStore = useRolesStore();
 const allRoleNames = computed(() => {
-    const names = new Set<string>();
-    employees.value.forEach(e => {
-        (e.roles || []).forEach((role: any) => {
-            if (role && role.name) names.add(role.name.trim());
-        });
-    });
-    // Đảm bảo luôn có 'Admin' (phân biệt hoa thường)
-    names.add('Admin');
-    return Array.from(names);
+    // Lấy danh sách roles từ store, fallback rỗng nếu chưa có
+    return (rolesStore.allRoles || []).map((role: any) => role.name?.trim()).filter(Boolean);
 });
 const roleBarData = computed<ChartData<'bar'>>(() => {
     const roleList = allRoleNames.value;
-    const counts = roleList.map(roleName => {
+    const counts = roleList.map((roleName: string) => {
         const normalizedRoleName = roleName.trim().toLowerCase();
         return employees.value.filter(e => (e.roles || []).some((r: any) => r && typeof r.name === 'string' && r.name.trim().toLowerCase() === normalizedRoleName)).length;
     });
@@ -127,7 +126,10 @@ definePageMeta({
 })
 
 const employeesStore = useEmployeesStore();
-const employees = computed<any[]>(() => employeesStore.allEmployees || []);
+import cloneDeep from 'lodash.clonedeep';
+// Đảm bảo mỗi lần employees thay đổi là một object mới (deep clone)
+const employees = computed<any[]>(() => cloneDeep(employeesStore.allEmployees || []));
+// Nếu gặp lỗi types, hãy chạy: npm i --save-dev @types/lodash.clonedeep
 
 // Group employees by department (assuming field: department or office_name)
 const departmentStats = computed(() => {
@@ -204,16 +206,22 @@ const chartOptions = {
 };
 
 onMounted(() => {
-    EmployeeService.fetch && EmployeeService.fetch();
+    reload();
+    // Đảm bảo chart cập nhật khi employees thay đổi
+    watch(employees, (val) => {
+        // eslint-disable-next-line no-console
+        console.log('Employees changed, chart should update:', val);
+    }, { deep: true });
     // Listen for employee-updated event to refresh chart data
     if (typeof window !== 'undefined') {
         window.addEventListener('employee-updated', reload);
     }
-    // Log dữ liệu employee để kiểm tra các trường (có thể bỏ sau khi debug)
-    setTimeout(() => {
-        // eslint-disable-next-line no-console
-        console.log('Employee data:', employees.value);
-    }, 1000);
+    // (Đã bỏ log delay để không gây chậm cập nhật dashboard)
+
+});
+
+onActivated(() => {
+    reload();
 });
 
 onBeforeUnmount(() => {

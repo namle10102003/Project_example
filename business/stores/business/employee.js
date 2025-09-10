@@ -10,9 +10,9 @@ export const useEmployeesStore = defineStore('employees', {
             ...createCachedEntry([], 0)
         },
     }),
-    persist: {
-        storage: persistedState.localStorage,
-    },
+    // persist: {
+    //     storage: persistedState.localStorage,
+    // },
     getters: {
         allEmployees: (state) => {
             return getCachedData(state.employees);
