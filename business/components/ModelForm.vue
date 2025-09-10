@@ -203,6 +203,10 @@ const saveEntry = async () => {
     if (!value) {
         return;
     }
+    // Always keep roles if present in current, to avoid losing roles when only status is changed
+    if (!('roles' in value) && current.value && current.value.roles) {
+        value.roles = current.value.roles;
+    }
     const { id } = value;
     const contentType = props.contentType
     if (contentType && contentType.includes('form-data')) {
@@ -218,6 +222,9 @@ const saveEntry = async () => {
             }
             origin.value = _cloneDeep(data);
             current.value = _cloneDeep(data);
+            // Emit event for parent to listen (for dashboard reload)
+            // @ts-ignore
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('employee-updated'));
         })
         .catch((e: any) => {
             console.error(e);
